@@ -1,12 +1,18 @@
 from flask import Flask, request, abort
-import timepad
-import time
+import time, wget, os
 from timepad.rest import ApiException
-#from timepad.configuration import Configuration
-from timepad import rest, configuration, Api, api_client, api
 from timepad.api import DefaultApi
 from timepad.configuration import Configuration
 from timepad.api_client import ApiClient
+import smtplib
+import mimetypes                                  
+from email import encoders                            
+from email.mime.base import MIMEBase          
+from email.mime.text import MIMEText          
+from email.mime.image import MIMEImage       
+from email.mime.multipart import MIMEMultipart
+from email.mime.audio import MIMEAudio
+
 
 configuration1 = Configuration()
 configuration1.access_token = 'c08ef390e759340fc86bd903ca8906894b59b1a4'
@@ -16,23 +22,81 @@ api_instance = DefaultApi(ApiClient(configuration1))
 
 app = Flask(__name__)
 
-
+email_domens = ['@timepath.ru', '@pminst.ru']
 
 @app.route('/', methods = ['POST'])
 def webhook():
     if request.method == 'POST':
         json_request = request.json
         try:
-            if json_request["status_raw"] == 'pending':
-                str_order_id = json_request["order_id"]
-                event_id = json_request["event_id"]
-                api_instance.approve_event_order(event_id, int(str_order_id))
+            email = json_request["email"]
+            domain = str(email)[str(email).find('@'):]
+            if domain in email_domens:
+                if json_request["status_raw"] == 'pending':
+                    str_order_id = json_request["order_id"]
+                    event_id = json_request["event_id"]
+                    api_instance.approve_event_order(event_id, int(str_order_id))
+                elif json_request["status_raw"] == 'ok':
+                    url = 'https://timepath.timepad.ru/event/export_ical/' + str(event_id) + '/'
+                    wget.download(url, '/' + json_request["event_name"] + '.ics')
+                    send_email(email, json_request["event_name"], 'Добрый день.\n\nВаша регистрация на событие подтверждена.', '/' + json_request["event_name"] + '.ics')
             return ('success', 200)
         except ApiException as e:
-            print("Exception when calling DefaultApi->approve_event_order: %s\n" % e)
+            #print("Exception when calling DefaultApi->approve_event_order: %s\n" % e)
             abort(400)
     else:
         abort(400)
+
+def send_email(address_to, msg_subj, msg_text, file):
+    address_from = ''
+    password = ''
+    msg = MIMEMultipart()
+    msg['From'] = address_from
+    msg['To'] = address_to
+    msg['Subject'] = msg_subj
+
+    body = msg_text
+    msg.attach(MIMEText(body, 'plain'))
+
+    process_attachement(msg, file)
+
+    server = smtplib.SMTP_SSL('smtp.server.ru', 465)
+    server.starttls()
+    server.login(address_from, password)
+    server.send_message(msg)
+    server.quit()
+
+def process_attachement(msg, files):
+    for f in files:
+        if os.path.isfile(f):                               
+            attach_file(msg,f)  
+
+def attach_file(msg, filepath):                             
+    filename = os.path.basename(filepath)                   
+    ctype, encoding = mimetypes.guess_type(filepath)        
+    if ctype is None or encoding is not None:               
+        ctype = 'application/octet-stream'                  
+    maintype, subtype = ctype.split('/', 1)                 
+    if maintype == 'text':                                  
+        with open(filepath) as fp:                          
+            file = MIMEText(fp.read(), _subtype=subtype)    
+            fp.close()                                      
+    elif maintype == 'image':                               
+        with open(filepath, 'rb') as fp:
+            file = MIMEImage(fp.read(), _subtype=subtype)
+            fp.close()
+    elif maintype == 'audio':                               
+        with open(filepath, 'rb') as fp:
+            file = MIMEAudio(fp.read(), _subtype=subtype)
+            fp.close()
+    else:                                                   
+        with open(filepath, 'rb') as fp:
+            file = MIMEBase(maintype, subtype)              
+            file.set_payload(fp.read())                     
+            fp.close()
+            encoders.encode_base64(file)                    
+    file.add_header('Content-Disposition', 'attachment', filename=filename) 
+    msg.attach(file)  
 
 if __name__ == '__main__':
     app.run()
