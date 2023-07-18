@@ -1,11 +1,12 @@
 from flask import Flask, request, abort
-import time, wget, os
+import time, wget, os, smtplib, mimetypes, requests
+from icalendar import Calendar, Event, vCalAddress, vText
+from datetime import datetime
+from pytz import UTC
 from timepad.rest import ApiException
 from timepad.api import DefaultApi
 from timepad.configuration import Configuration
-from timepad.api_client import ApiClient
-import smtplib
-import mimetypes                                  
+from timepad.api_client import ApiClient               
 from email import encoders                            
 from email.mime.base import MIMEBase          
 from email.mime.text import MIMEText          
@@ -24,8 +25,20 @@ app = Flask(__name__)
 
 email_domens = ['@timepath.ru', '@pminst.ru']
 
+@app.route('/webhook', methods = ['POST'])
+def webhook1():
+    if request.method == 'POST':
+        json_request = request.json
+        print(json_request)
+        print(json_request["name"])
+        return ('success', 200)
+    else:
+        abort(400)
+
+
 @app.route('/', methods = ['POST'])
 def webhook():
+    #TODO метод обработки вебхука
     if request.method == 'POST':
         json_request = request.json
         try:
@@ -48,8 +61,17 @@ def webhook():
         abort(400)
 
 def send_email(address_to, msg_subj, msg_text, file):
+    #TODO отправка сообщения на указанный адрес
+    
+    # почта
     address_from = ''
+
+    # пароль
     password = ''
+
+    # порт
+    port = 465
+
     msg = MIMEMultipart()
     msg['From'] = address_from
     msg['To'] = address_to
@@ -60,7 +82,7 @@ def send_email(address_to, msg_subj, msg_text, file):
 
     process_attachement(msg, file)
 
-    server = smtplib.SMTP_SSL('smtp.server.ru', 465)
+    server = smtplib.SMTP_SSL('smtp.server.ru', port)
     server.starttls()
     server.login(address_from, password)
     server.send_message(msg)
@@ -97,6 +119,47 @@ def attach_file(msg, filepath):
             encoders.encode_base64(file)                    
     file.add_header('Content-Disposition', 'attachment', filename=filename) 
     msg.attach(file)  
+
+def file_extract(event_id_to_str):
+    #TODO скачиване файла события и парсинг информации в словарь
+    d = dict()
+    url = "https://timepath.timepad.ru/event/export_ical/" + event_id_to_str + "/"
+    r = requests.get(url)
+
+    with open('timepath_' + event_id_to_str + '.ics', 'wb') as outfile:
+        outfile.write(r.content)
+        print(r.content)
+    
+    event_file = open('timepath_' + event_id_to_str + '.ics', 'rb')
+    event_file_cal = Calendar.from_ical(event_file.read())
+    for component in event_file_cal.walk():
+        if component.name == 'VEVENT':
+            d = dict(summary = component.get('summary'), dtstart = component.get('dtstart').dt, dtend = component.get('dtend').dt, dtstamp = component.get('dtstamp').dt, location = component.get('location'))
+    event_file.close()
+    return d
+
+def create_calendar_file_with_utc(json_request):
+    #TODO создание файла формата .ics с UTC
+    d = file_extract(json_request['event_id'])
+    dtstart = d.get('dtstart')
+    dtend = d.get('dtend')
+    dtstamp = d.get('dtstamp')
+
+    cal = Calendar()
+    cal.add('prodid', '-//Timepad Ltd.//NONSGML Timepad//RU')
+    cal.add('version', '2.0')
+    event = Event()
+
+    event.add('summary', d.get('summary'))
+    event.add('dtstart', datetime(dtstart.year, dtstart.month, dtstart.day, dtstart.hour, dtstart.minute, dtstart.second, tzinfo=UTC))
+    event.add('dtend', datetime(dtend.year, dtend.month, dtend.day, dtend.hour, dtend.minute, dtend.second, tzinfo=UTC))
+    event.add('dtstamp', datetime(dtstamp.year, dtstamp.month, dtstamp.day, dtstamp.hour, dtstamp.minute, dtstamp.second, tzinfo=UTC))
+    event.add('location', d.get('location'))
+    cal.add_component(event)
+    f = open(json_request['event_name'] + '.ics', 'wb')
+    f.write(cal.to_ical())
+    f.close()
+    
 
 if __name__ == '__main__':
     app.run()
