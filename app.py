@@ -33,16 +33,13 @@ def webhook():
         try:
             email = json_request["email"]
             domain = str(email)[str(email).find('@'):]
-            if domain in email_domens:
-                if json_request["status_raw"] == 'pending':
+            if domain in email_domens:    # если домен подходит
+                if json_request["status_raw"] == 'pending':    # проверка статуса билета
                     str_order_id = json_request["order_id"]
                     event_id = json_request["event_id"]
-                    api_instance.approve_event_order(event_id, int(str_order_id))
-                elif json_request["status_raw"] == 'ok':
-                    url = 'https://timepath.timepad.ru/event/export_ical/' + str(event_id) + '/'
-                    wget.download(url, '/' + json_request["event_name"] + '.ics')
+                    api_instance.approve_event_order(event_id, int(str_order_id))    # подтверждение заказа с помощью метода timepad api
+                elif json_request["status_raw"] == 'ok':    # проверка статуса билета
                     create_calendar_file_with_utc(json_request)
-
                     send_email(email, json_request["event_name"], 'Добрый день.\n\nВаша регистрация на событие подтверждена.', 'event_' + str(event_id) + '.ics')
             return ('success', 200)
         except ApiException as e:
