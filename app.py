@@ -25,18 +25,18 @@ app = Flask(__name__)
 
 email_domens = ['@timepath.ru', '@pminst.ru']
 
+# @app.route('/webhook', methods = ['POST'])
+# def webhook1():
+#     if request.method == 'POST':
+#         json_request = request.json
+#         print(json_request)
+#         print(json_request["name"])
+#         return ('success', 200)
+#     else:
+#         abort(400)
+
+
 @app.route('/webhook', methods = ['POST'])
-def webhook1():
-    if request.method == 'POST':
-        json_request = request.json
-        print(json_request)
-        print(json_request["name"])
-        return ('success', 200)
-    else:
-        abort(400)
-
-
-@app.route('/', methods = ['POST'])
 def webhook():
     #TODO метод обработки вебхука
     if request.method == 'POST':
@@ -52,7 +52,9 @@ def webhook():
                 elif json_request["status_raw"] == 'ok':
                     url = 'https://timepath.timepad.ru/event/export_ical/' + str(event_id) + '/'
                     wget.download(url, '/' + json_request["event_name"] + '.ics')
-                    send_email(email, json_request["event_name"], 'Добрый день.\n\nВаша регистрация на событие подтверждена.', '/' + json_request["event_name"] + '.ics')
+                    create_calendar_file_with_utc(json_request)
+
+                    send_email(email, json_request["event_name"], 'Добрый день.\n\nВаша регистрация на событие подтверждена.', 'event_' + str(event_id) + '.ics')
             return ('success', 200)
         except ApiException as e:
             #print("Exception when calling DefaultApi->approve_event_order: %s\n" % e)
@@ -80,7 +82,8 @@ def send_email(address_to, msg_subj, msg_text, file):
     body = msg_text
     msg.attach(MIMEText(body, 'plain'))
 
-    process_attachement(msg, file)
+    attach_file(msg, file)
+    #process_attachement(msg, file)
 
     server = smtplib.SMTP_SSL('smtp.server.ru', port)
     server.starttls()
@@ -88,35 +91,25 @@ def send_email(address_to, msg_subj, msg_text, file):
     server.send_message(msg)
     server.quit()
 
-def process_attachement(msg, files):
-    for f in files:
-        if os.path.isfile(f):                               
-            attach_file(msg,f)  
+# def process_attachement(msg, files):
+#     # Функция для добавления файлов в списке (в данный момент не нужна, так как к сообщению добавляется лишь один файл)
+#     for f in files:
+#         if os.path.isfile(f):                               
+#             attach_file(msg,f)  
 
-def attach_file(msg, filepath):                             
+def attach_file(msg: MIMEMultipart, filepath):       
+    #TODO Функция по добавлению конкретного файла к сообщению
     filename = os.path.basename(filepath)                   
     ctype, encoding = mimetypes.guess_type(filepath)        
     if ctype is None or encoding is not None:               
         ctype = 'application/octet-stream'                  
     maintype, subtype = ctype.split('/', 1)                 
-    if maintype == 'text':                                  
-        with open(filepath) as fp:                          
-            file = MIMEText(fp.read(), _subtype=subtype)    
-            fp.close()                                      
-    elif maintype == 'image':                               
-        with open(filepath, 'rb') as fp:
-            file = MIMEImage(fp.read(), _subtype=subtype)
-            fp.close()
-    elif maintype == 'audio':                               
-        with open(filepath, 'rb') as fp:
-            file = MIMEAudio(fp.read(), _subtype=subtype)
-            fp.close()
-    else:                                                   
-        with open(filepath, 'rb') as fp:
-            file = MIMEBase(maintype, subtype)              
-            file.set_payload(fp.read())                     
-            fp.close()
-            encoders.encode_base64(file)                    
+                                           
+    with open(filepath, 'rb') as fp:
+        file = MIMEBase(maintype, subtype)              
+        file.set_payload(fp.read())                     
+        fp.close()
+        encoders.encode_base64(file)                    
     file.add_header('Content-Disposition', 'attachment', filename=filename) 
     msg.attach(file)  
 
@@ -149,14 +142,14 @@ def create_calendar_file_with_utc(json_request):
     cal.add('prodid', '-//Timepad Ltd.//NONSGML Timepad//RU')
     cal.add('version', '2.0')
     event = Event()
-
+    
     event.add('summary', d.get('summary'))
     event.add('dtstart', datetime(dtstart.year, dtstart.month, dtstart.day, dtstart.hour, dtstart.minute, dtstart.second, tzinfo=UTC))
     event.add('dtend', datetime(dtend.year, dtend.month, dtend.day, dtend.hour, dtend.minute, dtend.second, tzinfo=UTC))
     event.add('dtstamp', datetime(dtstamp.year, dtstamp.month, dtstamp.day, dtstamp.hour, dtstamp.minute, dtstamp.second, tzinfo=UTC))
-    event.add('location', d.get('location'))
+    event.add('location', json_request["event_city"] + ', ' + json_request["event_place"])
     cal.add_component(event)
-    f = open(json_request['event_name'] + '.ics', 'wb')
+    f = open('event' + json_request['event_name'] + '.ics', 'wb')
     f.write(cal.to_ical())
     f.close()
     

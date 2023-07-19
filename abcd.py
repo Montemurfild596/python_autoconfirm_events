@@ -23,7 +23,7 @@ def create_calendar_file_with_utc1(a):
     event.add('dtstamp', datetime(dtstamp.year, dtstamp.month, dtstamp.day, dtstamp.hour, dtstamp.minute, dtstamp.second, tzinfo=UTC))
     event.add('location', d.get('location'))
     cal.add_component(event)
-    f = open(a + '.ics', 'wb')
+    f = open('event_' + a + '.ics', 'wb')
     f.write(cal.to_ical())
     f.close()
 
