@@ -23,18 +23,7 @@ api_instance = DefaultApi(ApiClient(configuration1))
 
 app = Flask(__name__)
 
-email_domens = ['@timepath.ru', '@pminst.ru']
-
-# @app.route('/webhook', methods = ['POST'])
-# def webhook1():
-#     if request.method == 'POST':
-#         json_request = request.json
-#         print(json_request)
-#         print(json_request["name"])
-#         return ('success', 200)
-#     else:
-#         abort(400)
-
+email_domens = ['@timepath.ru', '@pminst.ru', '@gmail.com']
 
 @app.route('/webhook', methods = ['POST'])
 def webhook():
