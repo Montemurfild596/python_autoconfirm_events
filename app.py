@@ -27,7 +27,7 @@ email_domens = ['@timepath.ru', '@pminst.ru', '@gmail.com']
 
 @app.route('/webhook', methods = ['POST'])
 def webhook():
-    #TODO метод обработки вебхука
+    # метод обработки вебхука
     if request.method == 'POST':
         json_request = request.json
         try:
@@ -49,7 +49,7 @@ def webhook():
         abort(400)
 
 def send_email(address_to, msg_subj, msg_text, file):
-    #TODO отправка сообщения на указанный адрес
+    # отправка сообщения на указанный адрес
     
     # почта
     address_from = ''
@@ -84,7 +84,7 @@ def send_email(address_to, msg_subj, msg_text, file):
 #             attach_file(msg,f)  
 
 def attach_file(msg: MIMEMultipart, filepath):       
-    #TODO Функция по добавлению конкретного файла к сообщению
+    # Функция по добавлению конкретного файла к сообщению
     filename = os.path.basename(filepath)                   
     ctype, encoding = mimetypes.guess_type(filepath)        
     if ctype is None or encoding is not None:               
@@ -100,7 +100,7 @@ def attach_file(msg: MIMEMultipart, filepath):
     msg.attach(file)  
 
 def file_extract(event_id_to_str):
-    #TODO скачиване файла события и парсинг информации в словарь
+    # скачиване файла события и парсинг информации в словарь
     d = dict()
     url = "https://timepath.timepad.ru/event/export_ical/" + event_id_to_str + "/"
     r = requests.get(url)
@@ -118,7 +118,7 @@ def file_extract(event_id_to_str):
     return d
 
 def create_calendar_file_with_utc(json_request):
-    #TODO создание файла формата .ics с UTC
+    # создание файла формата .ics с UTC
     d = file_extract(json_request['event_id'])
     dtstart = d.get('dtstart')
     dtend = d.get('dtend')
