@@ -23,7 +23,7 @@ api_instance = DefaultApi(ApiClient(configuration1))
 
 app = Flask(__name__)
 
-email_domens = ['@timepath.ru', '@pminst.ru', '@gmail.com']
+email_domens = ['@timepath.ru', '@pminst.ru']
 
 @app.route('/webhook', methods = ['POST'])
 def webhook():
@@ -44,18 +44,18 @@ def webhook():
             return ('success', 200)
         except ApiException as e:
             #print("Exception when calling DefaultApi->approve_event_order: %s\n" % e)
-            abort(400)
+            return ('success', 200)
     else:
-        abort(400)
+        return ('success', 200)
 
 def send_email(address_to, msg_subj, msg_text, file):
     # отправка сообщения на указанный адрес
     
     # почта
-    address_from = ''
+    address_from = 'myaddress@gmail.com'
 
     # пароль
-    password = ''
+    password = 'abcdefg12345'
 
     # порт
     port = 465
@@ -77,12 +77,6 @@ def send_email(address_to, msg_subj, msg_text, file):
     server.send_message(msg)
     server.quit()
 
-# def process_attachement(msg, files):
-#     # Функция для добавления файлов в списке (в данный момент не нужна, так как к сообщению добавляется лишь один файл)
-#     for f in files:
-#         if os.path.isfile(f):                               
-#             attach_file(msg,f)  
-
 def attach_file(msg: MIMEMultipart, filepath):       
     # Функция по добавлению конкретного файла к сообщению
     filename = os.path.basename(filepath)                   
@@ -100,7 +94,7 @@ def attach_file(msg: MIMEMultipart, filepath):
     msg.attach(file)  
 
 def file_extract(event_id_to_str):
-    # скачиване файла события и парсинг информации в словарь
+    # скачивание файла события и парсинг информации в словарь
     d = dict()
     url = "https://timepath.timepad.ru/event/export_ical/" + event_id_to_str + "/"
     r = requests.get(url)
